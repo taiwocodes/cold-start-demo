@@ -1,0 +1,12 @@
+{
+  "name": "cold-start-workshop-cf",
+  "version": "1.0.0",
+  "description": "Cloud Function code for cold start demo.",
+  "main": "index.js",
+  "scripts": {
+    "start": "functions-framework --target=demoColdStart"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.3.0"
+  }
+}
