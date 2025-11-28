@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Function Cold Start Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f7fafc; }
+    </style>
+</head>
+<body class="p-6 md:p-12 min-h-screen flex flex-col items-center">
+
+    <div class="max-w-4xl w-full bg-white shadow-xl rounded-xl p-8 space-y-8">
+        <header class="text-center border-b pb-4">
+            <h1 class="text-3xl font-bold text-gray-800">Serverless Latency Tester</h1>
+            <p class="text-lg text-gray-500 mt-1">Measuring Cold Start Impact on Web Vitals</p>
+        </header>
+
+        <!-- Configuration Section -->
+        <section class="space-y-4">
+            <h2 class="text-xl font-semibold text-indigo-600">Configuration</h2>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="functionUrl" placeholder="Enter Deployed Cloud Function URL (https://...)" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm">
+                <button id="runTestButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-6 rounded-lg shadow-md transition duration-150 ease-in-out">
+                    Run Cold Start Test
+                </button>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section class="space-y-4">
+            <h2 class="text-xl font-semibold text-indigo-600 border-t pt-4">Results</h2>
+            <div id="loadingIndicator" class="hidden flex items-center justify-center p-4">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-gray-600">Invoking function... watch the latency, especially the first time!</span>
+            </div>
+
+            <div id="resultsContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center">
+                
+                <!-- Total Latency Card -->
+                <div class="bg-indigo-50 p-6 rounded-xl shadow-lg border border-indigo-200">
+                    <p class="text-sm font-medium text-indigo-600">Total Client-Side Latency (End-to-End)</p>
+                    <p id="clientLatency" class="text-4xl font-extrabold text-indigo-800 mt-2">0.00 ms</p>
+                </div>
+                
+                <!-- Server Duration Card -->
+                <div class="bg-teal-50 p-6 rounded-xl shadow-lg border border-teal-200">
+                    <p class="text-sm font-medium text-teal-600">Server-Side Execution Time</p>
+                    <p id="serverTime" class="text-4xl font-extrabold text-teal-800 mt-2">0.00 ms</p>
+                </div>
+
+                <!-- Web Vitals Context -->
+                <div class="col-span-1 sm:col-span-2 bg-gray-50 p-4 rounded-lg text-left text-sm">
+                    <p class="font-bold text-gray-700">Web Vitals Connection:</p>
+                    <p class="text-gray-600">This latency is often the primary driver of a slow Largest Contentful Paint (LCP) when key data is fetched via serverless APIs.</p>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        const runTestButton = document.getElementById('runTestButton');
+        const functionUrlInput = document.getElementById('functionUrl');
+        const clientLatencyDisplay = document.getElementById('clientLatency');
+        const serverTimeDisplay = document.getElementById('serverTime');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+
+        // Initial setup for the function URL
+        if (localStorage.getItem('functionUrl')) {
+            functionUrlInput.value = localStorage.getItem('functionUrl');
+        }
+
+        async function runTest() {
+            const functionUrl = functionUrlInput.value.trim();
+            if (!functionUrl) {
+                alert('Please enter your Cloud Function URL.');
+                return;
+            }
+            
+            // Save URL for next time
+            localStorage.setItem('functionUrl', functionUrl);
+
+            // Reset UI and show loading
+            clientLatencyDisplay.textContent = '...';
+            serverTimeDisplay.textContent = '...';
+            loadingIndicator.classList.remove('hidden');
+            
+            // Client-side latency measurement start
+            const clientStart = performance.now();
+
+            try {
+                const response = await fetch(functionUrl, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);js
+                }
+
+                const data = await response.json();
+                
+                // Client-side latency measurement end
+                const clientEnd = performance.now();
+                const totalClientLatency = (clientEnd - clientStart).toFixed(2);
+
+                clientLatencyDisplay.textContent = `${totalClientLatency} ms`;
+                serverTimeDisplay.textContent = `${data.serverDurationMs} ms`;
+
+            } catch (error) {
+                const clientEnd = performance.now();
+                const totalClientLatency = (clientEnd - clientStart).toFixed(2);
+
+                clientLatencyDisplay.textContent = `${totalClientLatency} ms (Error)`;
+                serverTimeDisplay.textContent = `N/A`;
+                console.error("Fetch error:", error);
+                alert(`Error during function invocation. Check console for details. Ensure CORS is enabled and the URL is correct.\n\nError: ${error.message}`);
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+
+        runTestButton.addEventListener('click', runTest);
+    </script>
+</body>
+</html>
